@@ -1,0 +1,222 @@
+---
+title: "Tablero interactivo sobre félidos de Costa Rica"
+format: 
+  dashboard:
+    orientation: rows
+lang: es
+theme: flaty
+server: shiny
+---
+
+```{r}
+#| label: carga-paquetes
+#| context: setup
+
+library(tidyverse)
+library(DT)
+library(plotly)
+library(sf)
+library(leaflet)
+```
+
+```{r}
+#| label: carga-datos
+#| context: data
+
+
+felidos <-
+  st_read(
+    "felidos.csv",
+    options = c(
+      "X_POSSIBLE_NAMES=decimalLongitude",
+      "Y_POSSIBLE_NAMES=decimalLatitude"
+    ),
+    quiet = TRUE
+  )
+
+st_crs(felidos) <- 4326
+```
+
+# {.sidebar}
+
+```{r}
+#| label: widgets-entrada
+
+# Lista ordenada de especies
+lista_especies <- unique(felidos$species)
+lista_especies <- sort(lista_especies)
+lista_especies <- c("Todas", lista_especies)
+
+# Widget de lista de selección de especies
+selectInput(
+  inputId = "especie",
+  label = "Especie",
+  choices = lista_especies,
+  selected = "Todas"
+)
+
+# Lista ordenada de provincia 
+lista_provincias <- unique(felidos$stateProvince)
+lista_provincias <- sort(lista_provincias)
+lista_provincias <- c("Todas", lista_provincias)
+
+# Widget de lista de seleccion de provincias
+selectInput(
+ inputId = "provincia",
+  label = "Provincia",
+  choices = lista_provincias,
+  selected = "Todas" 
+)
+```
+
+#
+
+## Row {heigth=60%}
+
+
+```{r}
+#| label: tabla-registros-presencia
+
+
+# Encabezado de nivel 3
+h3("Registros de presencia")
+HTML("<p>")
+
+# Widget de tabla interactiva
+dataTableOutput(
+	outputId =  "tabla" # identificador del widget
+)
+```
+
+
+```{r}
+#| label: mapa-registros-presencia
+
+h3("Mapa de registros de presencia")
+HTML("<p>")
+# Widget de mapa interactivo
+leafletOutput(
+  outputId = "mapa" # identificador del widget
+)
+```
+
+
+## Row {heigth=40%}
+
+
+```{r}
+#| label: graficos-registros-presencia-x-mes
+
+h3("Grafico de registros de presencia por mes")
+HTML("<p>")
+
+# Widget de grafico interactivo
+plotlyOutput(
+  outputId = "grafico"
+)
+```
+
+
+
+```{r}
+#| label: servidor
+#| context: server
+
+# Función reactiva para filtrar los registros de presencia de félidos
+# de acuerdo con los filtros especificados por el usuario
+filtrar_felidos <- reactive({
+  # Valor inicial del objeto que va a retornarse
+  felidos_filtrados <- felidos
+  
+  # Se realiza el filtro, solamente si el usario ha seleccionado 
+  # una opción diferente a "Todas" en la lista de selección de especies
+  if (input$especie != "Todas") {
+    felidos_filtrados <-
+      felidos_filtrados |>
+      filter(species == input$especie)
+  }
+  
+  # Filtro por provincia
+  
+  if (input$provincia != "Todas") (
+    felidos_filtrados <- 
+      felidos_filtrados |>
+      filter(stateProvince == input$provincia)
+  )
+
+  return(felidos_filtrados)
+}) 
+
+
+# Tabla interactiva de registros de presencia
+output$tabla <- renderDataTable({
+	# Filtrado del conjunto de datos
+  felidos <- filtrar_felidos()
+  
+  # Tabla interactiva
+  felidos |>
+    st_drop_geometry() |>
+    select(family, genus, species, stateProvince, year, month, day) |>
+    datatable(
+    	rownames = FALSE,
+      colnames = c("Familia", "Género", "Especie", "Provincia", "Año", "Mes", "Día"),
+      options = list(
+      	# pageLength = 10,
+        language = list(url = '//cdn.datatables.net/plug-ins/1.10.11/i18n/Spanish.json')
+      )
+    )
+})
+
+# Mapa interactivo de registros de presencia
+output$mapa <- renderLeaflet({
+# Filtrado del conjunto de datos
+  felidos <- filtrar_felidos()
+  
+  leaflet() |>
+    addTiles(group = "OSM") |> 
+    addCircleMarkers(
+      data = felidos,
+      radius = 4,
+      color = "green",
+      fillOpacity = "green",
+      stroke = FALSE,
+      group = "Felidos"
+    )
+  })
+
+# Grafico interactivo de registros de presencia por mes
+output$grafico <- renderPlotly({
+  # Filtrado del conjunto de datos
+  felidos <- filtrar_felidos()
+
+  grafico_ggplot2 <- 
+felidos |> 
+ st_drop_geometry() |>
+    group_by(month) |>
+    summarise(n = n()) |>
+ ggplot(aes(x = reorder(month, as.integer(month)), y = n)) +
+    geom_col() + 
+    xlab("Mes") +
+    ylab("Cantidad de registros") 
+  ggplotly(grafico_ggplot2) |> config(locale = "es")
+  
+})
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

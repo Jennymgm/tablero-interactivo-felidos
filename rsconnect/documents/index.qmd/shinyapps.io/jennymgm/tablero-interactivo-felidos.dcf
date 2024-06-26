@@ -1,0 +1,14 @@
+name: tablero-interactivo-felidos
+title: tablero-interactivo-felidos
+username: jennymgm
+account: jennymgm
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 12234058
+bundleId: 8792123
+url: https://jennymgm.shinyapps.io/tablero-interactivo-felidos/
+version: 1
+quarto_version: 1.4.555
+quarto_engines: knitr
+asMultiple: FALSE
+asStatic: FALSE
